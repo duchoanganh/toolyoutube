@@ -1,0 +1,46 @@
+VIDEO CHÍNH THỨC TỪ TUBEAUTO AI
+--------------------------------
+Do máy chưa cài môi trường FFmpeg/MoviePy nên file này đóng vai trò thay thế cho file .MP4.
+Kịch bản của dự án đã được xử lý:
+{
+    "project": "Ultimate TubeAuto Project",
+    "totalScenes": 3,
+    "totalDuration": 15.9,
+    "scenes": [
+        {
+            "id": 1,
+            "duration": 6.1
+        },
+        {
+            "id": 2,
+            "duration": 5.7
+        },
+        {
+            "id": 3,
+            "duration": 4.1
+        }
+    ],
+    "selectedSources": {
+        "1": {
+            "src": "https://picsum.photos/seed/0.9018840592906028/300/170",
+            "originalDuration": 5,
+            "duration": 6.1,
+            "isSynced": true,
+            "type": "img"
+        },
+        "2": {
+            "src": "https://picsum.photos/seed/0.8197800868229972/300/170",
+            "originalDuration": 5,
+            "duration": 5.7,
+            "isSynced": true,
+            "type": "img"
+        },
+        "3": {
+            "src": "https://picsum.photos/seed/0.6801917029389319/300/170",
+            "originalDuration": 3.5,
+            "duration": 4.1,
+            "isSynced": true,
+            "type": "vid"
+        }
+    }
+}
