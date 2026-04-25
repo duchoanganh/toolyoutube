@@ -12,8 +12,38 @@ import shutil
 import json
 import sys
 import subprocess
+import sqlite3
+from datetime import datetime
 
 app = Flask(__name__)
+CORS(app) # Cho phép Backend nhận request từ Frontend
+
+# === CƠ SỞ DỮ LIỆU SQLITE NỘI BỘ ===
+DATABASE = 'tubeauto.db'
+
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_db() as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                theme TEXT,
+                status TEXT DEFAULT 'Bản nháp',
+                script TEXT,
+                scenes_data TEXT,
+                selected_sources TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+
+init_db()
 CORS(app) # Cho phép Backend nhận request từ Frontend
 
 OUTPUT_FILENAME = "CapCut_Export.zip"
@@ -171,6 +201,80 @@ def open_folder():
         return jsonify({"status": "success", "message": "Đã mở thư mục"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+# ==========================================
+# DATABASE ENDPOINTS FOR PROJECTS
+# ==========================================
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    conn = get_db()
+    projects = conn.execute('SELECT id, name, theme, status, created_at, updated_at FROM projects ORDER BY updated_at DESC').fetchall()
+    conn.close()
+    return jsonify([dict(p) for p in projects])
+
+@app.route('/api/projects', methods=['POST'])
+def create_project():
+    data = request.json
+    name = data.get('name', 'Dự án không tên')
+    theme = data.get('theme', 'Chưa phân loại')
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO projects (name, theme, script, scenes_data, selected_sources) VALUES (?, ?, ?, ?, ?)',
+                   (name, theme, '', '[]', '{}'))
+    conn.commit()
+    project_id = cursor.lastrowid
+    conn.close()
+    return jsonify({"status": "success", "id": project_id, "name": name, "theme": theme})
+
+@app.route('/api/projects/<int:project_id>', methods=['GET'])
+def get_project(project_id):
+    conn = get_db()
+    project = conn.execute('SELECT * FROM projects WHERE id = ?', (project_id,)).fetchone()
+    conn.close()
+    if project:
+        return jsonify(dict(project))
+    return jsonify({"status": "error", "message": "Không tìm thấy dự án"}), 404
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    data = request.json
+    script = data.get('script')
+    scenes_data = data.get('scenes_data') # stringified JSON
+    selected_sources = data.get('selected_sources') # stringified JSON
+    status = data.get('status')
+    
+    # Chỉ update những trường được gửi lên
+    update_fields = []
+    params = []
+    
+    if script is not None:
+        update_fields.append("script = ?")
+        params.append(script)
+    if scenes_data is not None:
+        update_fields.append("scenes_data = ?")
+        params.append(scenes_data)
+    if selected_sources is not None:
+        update_fields.append("selected_sources = ?")
+        params.append(selected_sources)
+    if status is not None:
+        update_fields.append("status = ?")
+        params.append(status)
+        
+    if not update_fields:
+        return jsonify({"status": "success", "message": "Không có gì để update"})
+        
+    update_fields.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(project_id)
+    
+    query = f"UPDATE projects SET {', '.join(update_fields)} WHERE id = ?"
+    
+    conn = get_db()
+    conn.execute(query, params)
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
 
 if __name__ == '__main__':
     print("   Bắt đầu Backend MoviePy API Render Engine ở port 5000...")

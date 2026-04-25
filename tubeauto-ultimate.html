@@ -197,26 +197,18 @@
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin: 0;">Dự án đang làm việc</h3>
-                    <button class="btn btn-primary" onclick="document.querySelectorAll('.nav-menu li')[2].click()">+ Tạo Dự án Mới</button>
+                    <button class="btn btn-primary" onclick="createNewProject()">+ Tạo Dự án Mới</button>
                 </div>
-                <table class="project-table">
+                <table class="project-table" id="dashboard-projects-table">
                     <tr>
                         <th>Tên Dự án</th>
                         <th>Chủ đề phân loại</th>
                         <th>Trạng thái</th>
+                        <th>Thời gian tạo</th>
                         <th>Hành động</th>
                     </tr>
-                    <tr>
-                        <td><strong>Khám phá Hố Đen Vũ Trụ</strong></td>
-                        <td>Khoa Học Vui</td>
-                        <td><span style="background: rgba(245,158,11,0.2); color: var(--warning); padding: 4px 8px; border-radius: 4px; font-size: 12px;">Bản nháp</span></td>
-                        <td><button class="btn btn-primary" style="padding: 6px 12px;" onclick="document.querySelectorAll('.nav-menu li')[2].click()">Mở Studio</button></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Lịch sử Đế chế La Mã</strong></td>
-                        <td>Lịch Sử AI</td>
-                        <td><span style="background: rgba(16,185,129,0.2); color: var(--audio); padding: 4px 8px; border-radius: 4px; font-size: 12px;">Đã đóng gói CapCut</span></td>
-                        <td><button class="btn btn-outline" style="padding: 6px 12px;" onclick="openStorageFolder()">Mở thư mục</button></td>
+                    <tr id="loading-projects">
+                        <td colspan="5" style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải dữ liệu dự án...</td>
                     </tr>
                 </table>
             </div>
@@ -554,7 +546,7 @@
             alert(msg);
         }
 
-        // LOAD API KEYS
+        // LOAD API KEYS VÀ DATA TỪ DB
         window.onload = () => {
             document.getElementById('api_pexels').value = localStorage.getItem('api_pexels') || '';
             document.getElementById('api_openai').value = localStorage.getItem('api_openai') || '';
@@ -562,6 +554,9 @@
             document.getElementById('api_sora').value = localStorage.getItem('api_sora') || '';
             document.getElementById('api_gemini').value = localStorage.getItem('api_gemini') || '';
             updateCreditDisplay();
+            
+            // Gọi server lấy dự án
+            fetchProjects();
         };
 
         function saveAPIKeys() {
@@ -767,6 +762,9 @@
             });
             
             updateTimeline();
+            
+            // Lưu trạng thái vào Database
+            saveProjectState();
         }
 
         // 3. TAB CHUYỂN
@@ -934,11 +932,15 @@
                 originalDuration: dur,
                 duration: dur, // Thời lượng hiện tại trên timeline
                 isSynced: false, // Trạng thái Loop/Stretch
-                type: mediaType
+                type: mediaType,
+                thumb: mediaType === 'stock' ? imgEl.src : srcUrl
             };
             
             updateTimeline();
             resetBtnSync();
+            
+            // Lưu trạng thái Database
+            saveProjectState();
         }
 
         function resetBtnSync() {
@@ -1336,6 +1338,216 @@
             }, 3000);
         }
 
+        // ==========================================
+        // QUẢN LÝ DATABASE VÀ DỰ ÁN
+        // ==========================================
+        let currentProjectId = null;
+
+        async function fetchProjects() {
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/projects');
+                const projects = await res.json();
+                
+                const table = document.getElementById('dashboard-projects-table');
+                table.innerHTML = `
+                    <tr>
+                        <th>Tên Dự án</th>
+                        <th>Chủ đề phân loại</th>
+                        <th>Trạng thái</th>
+                        <th>Thời gian tạo</th>
+                        <th>Hành động</th>
+                    </tr>
+                `;
+                
+                if (projects.length === 0) {
+                    table.innerHTML += `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có dự án nào. Hãy tạo dự án mới!</td></tr>`;
+                    return;
+                }
+
+                projects.forEach(p => {
+                    const isDraft = p.status.includes('Nháp');
+                    const statusColor = isDraft ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)';
+                    const textColor = isDraft ? 'var(--warning)' : 'var(--audio)';
+                    
+                    table.innerHTML += `
+                        <tr>
+                            <td><strong>${p.name}</strong></td>
+                            <td>${p.theme}</td>
+                            <td><span style="background: ${statusColor}; color: ${textColor}; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${p.status}</span></td>
+                            <td>${new Date(p.created_at).toLocaleString('vi-VN')}</td>
+                            <td>
+                                <button class="btn btn-primary" style="padding: 6px 12px;" onclick="openProject(${p.id})">Mở Studio</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.error("Lỗi tải dự án:", err);
+                document.getElementById('loading-projects').innerHTML = `<td colspan="5" style="text-align: center; color: var(--yt-red); padding: 20px;">Lỗi kết nối Backend. Vui lòng chạy start.bat!</td>`;
+            }
+        }
+
+        async function createNewProject() {
+            const name = prompt("Nhập tên Dự án mới:", "Dự án Video Trí tuệ Nhân tạo");
+            if (!name) return;
+            const theme = prompt("Nhập Chủ đề phân loại (VD: Khoa Học, Lịch Sử):", "Chưa phân loại");
+            
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, theme: theme || "Chưa phân loại" })
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    currentProjectId = data.id;
+                    // Reset UI
+                    document.getElementById('scriptInput').value = '';
+                    scenesData = [];
+                    selectedSources = {};
+                    document.getElementById('scenesContainer').innerHTML = '';
+                    document.getElementById('timeline-track').innerHTML = '';
+                    
+                    // Chuyển sang tab Studio
+                    document.querySelectorAll('.nav-menu li')[2].click();
+                    alert(`Đã tạo dự án mới: ${name}`);
+                    fetchProjects(); // reload dashboard
+                }
+            } catch (err) {
+                console.error("Lỗi tạo dự án:", err);
+                alert("Lỗi kết nối tới cơ sở dữ liệu!");
+            }
+        }
+
+        async function openProject(id) {
+            try {
+                const res = await fetch(`http://127.0.0.1:5000/api/projects/${id}`);
+                const p = await res.json();
+                
+                if (p.id) {
+                    currentProjectId = p.id;
+                    document.getElementById('scriptInput').value = p.script || '';
+                    scenesData = JSON.parse(p.scenes_data || '[]');
+                    selectedSources = JSON.parse(p.selected_sources || '{}');
+                    
+                    if (scenesData.length > 0) {
+                        renderUIFromState();
+                    } else {
+                        document.getElementById('scenesContainer').innerHTML = '';
+                    }
+                    
+                    updateTimeline();
+                    document.querySelectorAll('.nav-menu li')[2].click();
+                }
+            } catch(err) {
+                console.error("Lỗi mở dự án:", err);
+                alert("Lỗi tải dữ liệu dự án!");
+            }
+        }
+        
+        function renderUIFromState() {
+            const container = document.getElementById('scenesContainer');
+            container.innerHTML = '';
+            
+            scenesData.forEach((sc, index) => {
+                const id = sc.id;
+                const sentence = sc.text;
+                
+                // Tiêu đề Phân đoạn (Giả lập mỗi đoạn có 5 cảnh)
+                if (index % 5 === 0) {
+                    container.insertAdjacentHTML('beforeend', `
+                        <div style="padding: 10px 15px; background: rgba(139,92,246,0.1); border-left: 4px solid var(--primary); margin: 25px 0 15px 0; font-weight: bold; color: var(--primary); border-radius: 0 8px 8px 0;">
+                            <i class="fa-solid fa-layer-group"></i> Phân đoạn ${Math.floor(index/5) + 1}
+                        </div>
+                    `);
+                }
+
+                const sceneHTML = `
+                <div class="scene-card" id="scene-${id}">
+                    <div class="scene-header">
+                        <div class="scene-badge">🎬 Cảnh ${id}</div>
+                        <div style="font-style: italic; color: #cbd5e1; line-height: 1.5; font-size: 13px;">"${sentence}"</div>
+                    </div>
+                    
+                    <div class="tabs">
+                        <button class="tab-btn active-img" id="btn-img-${id}" onclick="switchTab(${id}, 'img')"><i class="fa-solid fa-image"></i> Ảnh AI</button>
+                        <button class="tab-btn" id="btn-vid-${id}" onclick="switchTab(${id}, 'vid')"><i class="fa-solid fa-film"></i> Video AI</button>
+                        <button class="tab-btn" id="btn-stock-${id}" onclick="switchTab(${id}, 'stock')"><i class="fa-solid fa-search"></i> Stock Video</button>
+                    </div>
+
+                    <div class="tab-content" id="tab-img-${id}" style="display: block;">
+                        <div style="display: flex; gap: 10px;">
+                            <select id="engine-img-${id}" class="form-control" style="width: 140px; font-size: 12px;">
+                                <option value="midjourney">🎨 Midjourney</option>
+                                <option value="dalle">🤖 DALL-E 3</option>
+                                <option value="gemini">✨ Gemini</option>
+                            </select>
+                            <input type="text" class="form-control" value="Cinematic, hyper realistic --ar 16:9">
+                            <button class="btn btn-primary" onclick="loadMedia(${id}, 'img')">Tạo Ảnh</button>
+                        </div>
+                        <div class="media-grid" id="grid-img-${id}">
+                            ${selectedSources[id] && selectedSources[id].type === 'img' ? 
+                              `<div class="media-slot selected" data-type="img" data-src="${selectedSources[id].src}" onclick="selectSource(this, ${id})"><img src="${selectedSources[id].src}"></div>` 
+                              : '<div class="media-slot"></div>'}
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-vid-${id}">
+                        <div style="display: flex; gap: 10px;">
+                            <select id="engine-vid-${id}" class="form-control" style="width: 140px; font-size: 12px;">
+                                <option value="sora">🎥 OpenAI Sora</option>
+                                <option value="veo">🌌 Google Veo</option>
+                            </select>
+                            <input type="text" class="form-control" value="Slow motion cinematic b-roll">
+                            <button class="btn" style="background: var(--ai-vid); color: white;" onclick="loadMedia(${id}, 'vid')">Tạo Video</button>
+                        </div>
+                        <div class="media-grid" id="grid-vid-${id}">
+                            ${selectedSources[id] && selectedSources[id].type === 'vid' ? 
+                              `<div class="media-slot selected" style="grid-column:span 2" data-type="vid" data-src="${selectedSources[id].src}" onclick="selectSource(this, ${id})"><img src="${selectedSources[id].thumb || selectedSources[id].src}"><div style="position:absolute; bottom:5px; left:5px; background:rgba(0,0,0,0.8); color:#fff; font-size:10px; padding:2px 5px; border-radius:3px; font-weight:bold;">${selectedSources[id].duration}s</div></div>` 
+                              : ''}
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-stock-${id}">
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" class="form-control" value="galaxy space">
+                            <button class="btn" style="background: var(--stock); color: white;" onclick="loadMedia(${id}, 'stock')">Tìm Search</button>
+                        </div>
+                        <div class="media-grid" id="grid-stock-${id}">
+                             ${selectedSources[id] && selectedSources[id].type === 'stock' ? 
+                              `<div class="media-slot selected" style="grid-column:span 2" data-type="stock" data-src="${selectedSources[id].src}" onclick="selectSource(this, ${id})"><img src="${selectedSources[id].thumb || selectedSources[id].src}"></div>` 
+                              : ''}
+                        </div>
+                    </div>
+                </div>`;
+                container.insertAdjacentHTML('beforeend', sceneHTML);
+            });
+        }
+
+        async function saveProjectState(status = null) {
+            if (!currentProjectId) return;
+            
+            const payload = {
+                script: document.getElementById('scriptInput').value,
+                scenes_data: JSON.stringify(scenesData),
+                selected_sources: JSON.stringify(selectedSources)
+            };
+            if(status) payload.status = status;
+            
+            try {
+                await fetch(`http://127.0.0.1:5000/api/projects/${currentProjectId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                // Reload danh sách dự án nếu cần thiết ở ngoài Dashboard
+                if (status) fetchProjects();
+            } catch(e) {
+                console.error("Auto-save failed", e);
+            }
+        }
     </script>
 </body>
 </html>
