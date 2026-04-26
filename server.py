@@ -17,6 +17,11 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from flask import send_from_directory
 
+import sys
+import io
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
 app = Flask(__name__)
 CORS(app) # Cho phép Backend nhận request từ Frontend
 
