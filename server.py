@@ -14,6 +14,8 @@ import sys
 import subprocess
 import sqlite3
 from datetime import datetime
+from werkzeug.utils import secure_filename
+from flask import send_from_directory
 
 app = Flask(__name__)
 CORS(app) # Cho phép Backend nhận request từ Frontend
@@ -91,6 +93,11 @@ def render_video():
         shutil.rmtree(export_dir)
     os.makedirs(export_dir)
     
+    images_dir = os.path.join(export_dir, "Images")
+    videos_dir = os.path.join(export_dir, "Videos")
+    os.makedirs(images_dir)
+    os.makedirs(videos_dir)
+    
     def format_time(seconds):
         ms = int((seconds % 1) * 1000)
         s = int(seconds)
@@ -126,18 +133,18 @@ def render_video():
         local_path = download_file(url, f"temp_scene_{sid}_{int(time.time())}")
         
         if local_path:
-            ext = ".jpg" if local_path.endswith(".jpg") else ".mp4"
-            new_filename = f"{file_counter:02d}.mp4"
-            new_path = os.path.join(export_dir, new_filename)
+            ext = ".jpg" if local_path.lower().endswith(".jpg") or local_path.lower().endswith(".png") or local_path.lower().endswith(".jpeg") else ".mp4"
             
             try:
-                print(f"   -> Đang đồng bộ thời lượng {duration}s cho {new_filename}...")
                 if ext == ".jpg":
-                    clip = ImageClip(local_path).set_duration(duration)
-                    clip = clip.resize(newsize=(1280, 720))
-                    clip.write_videofile(new_path, fps=24, codec="libx264", preset="ultrafast", audio=False, verbose=False, logger=None)
-                    clip.close()
+                    new_filename = f"{file_counter:02d}_scene.jpg"
+                    new_path = os.path.join(images_dir, new_filename)
+                    shutil.copy(local_path, new_path)
+                    print(f" - Đã chép file ảnh {new_filename} vào thư mục Images/")
                 else:
+                    new_filename = f"{file_counter:02d}_scene.mp4"
+                    new_path = os.path.join(videos_dir, new_filename)
+                    print(f"   -> Đang đồng bộ thời lượng {duration}s cho video {new_filename}...")
                     clip = VideoFileClip(local_path)
                     if clip.duration < duration:
                         clip = clip.loop(duration=duration)
@@ -146,9 +153,12 @@ def render_video():
                     clip = clip.resize(newsize=(1280, 720)).without_audio()
                     clip.write_videofile(new_path, fps=24, codec="libx264", preset="ultrafast", audio=False, verbose=False, logger=None)
                     clip.close()
-                print(f" - Đã đồng bộ thành công {new_filename}")
+                    print(f" - Đã xuất thành công video {new_filename} vào thư mục Videos/")
             except Exception as e:
                 print(f" [LỖI] Không thể xử lý Cảnh {sid}: {e}")
+                # Fallback copy
+                fallback_filename = f"{file_counter:02d}_scene{ext}"
+                shutil.copy(local_path, os.path.join(export_dir, fallback_filename))
                 
         file_counter += 1
         
@@ -184,6 +194,24 @@ def download_video():
     if os.path.exists(OUTPUT_FILENAME):
         return send_file(OUTPUT_FILENAME, as_attachment=True, download_name="CapCut_Assets.zip", mimetype="application/zip")
     return "Lỗi: Không tìm thấy render.", 404
+
+@app.route('/temp_media/<path:filename>')
+def serve_temp_media(filename):
+    return send_from_directory(TEMP_DIR, filename)
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "No selected file"}), 400
+    if file:
+        filename = secure_filename(f"upload_{int(time.time())}_{file.filename}")
+        filepath = os.path.join(TEMP_DIR, filename)
+        file.save(filepath)
+        file_url = f"http://127.0.0.1:5000/temp_media/{filename}"
+        return jsonify({"status": "success", "url": file_url})
 
 @app.route('/api/open-folder', methods=['POST'])
 def open_folder():

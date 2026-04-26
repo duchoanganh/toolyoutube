@@ -638,6 +638,7 @@
                         <button class="tab-btn active-img" id="btn-img-${id}" onclick="switchTab(${id}, 'img')"><i class="fa-solid fa-image"></i> Ảnh AI</button>
                         <button class="tab-btn" id="btn-vid-${id}" onclick="switchTab(${id}, 'vid')"><i class="fa-solid fa-film"></i> Video AI</button>
                         <button class="tab-btn" id="btn-stock-${id}" onclick="switchTab(${id}, 'stock')"><i class="fa-solid fa-search"></i> Stock Video</button>
+                        <button class="tab-btn" id="btn-upload-${id}" onclick="switchTab(${id}, 'upload')"><i class="fa-solid fa-upload"></i> Tải lên</button>
                     </div>
 
                     <div class="tab-content" id="tab-img-${id}" style="display: block;">
@@ -753,6 +754,14 @@
                             </div>
                             <div class="media-grid" id="grid-stock-${id}"></div>
                         </div>
+
+                        <div class="tab-content" id="tab-upload-${id}">
+                            <div style="display: flex; gap: 10px;">
+                                <input type="file" id="file-upload-${id}" class="form-control" accept="image/*,video/*" style="padding: 5px;">
+                                <button class="btn" style="background: var(--warning); color: #000;" onclick="handleLocalUpload(${id})"><i class="fa-solid fa-cloud-arrow-up"></i> Tải lên</button>
+                            </div>
+                            <div class="media-grid" id="grid-upload-${id}"></div>
+                        </div>
                     </div>`;
                     container.insertAdjacentHTML('beforeend', sceneHTML);
                     
@@ -769,7 +778,7 @@
 
         // 3. TAB CHUYỂN
         function switchTab(sceneId, type) {
-            ['img', 'vid', 'stock'].forEach(t => {
+            ['img', 'vid', 'stock', 'upload'].forEach(t => {
                 document.getElementById(`tab-${t}-${sceneId}`).style.display = 'none';
                 document.getElementById(`btn-${t}-${sceneId}`).className = 'tab-btn';
             });
@@ -888,7 +897,6 @@
                         });
                     }
                 } else {
-                    // Trừ Credit nếu dùng API thật
                     if (isImg) userCredits -= 1;
                     else if (!isStock) userCredits -= 5;
                     updateCreditDisplay();
@@ -1474,6 +1482,7 @@
                         <button class="tab-btn active-img" id="btn-img-${id}" onclick="switchTab(${id}, 'img')"><i class="fa-solid fa-image"></i> Ảnh AI</button>
                         <button class="tab-btn" id="btn-vid-${id}" onclick="switchTab(${id}, 'vid')"><i class="fa-solid fa-film"></i> Video AI</button>
                         <button class="tab-btn" id="btn-stock-${id}" onclick="switchTab(${id}, 'stock')"><i class="fa-solid fa-search"></i> Stock Video</button>
+                        <button class="tab-btn" id="btn-upload-${id}" onclick="switchTab(${id}, 'upload')"><i class="fa-solid fa-upload"></i> Tải lên</button>
                     </div>
 
                     <div class="tab-content" id="tab-img-${id}" style="display: block;">
@@ -1487,7 +1496,7 @@
                             <button class="btn btn-primary" onclick="loadMedia(${id}, 'img')">Tạo Ảnh</button>
                         </div>
                         <div class="media-grid" id="grid-img-${id}">
-                            ${selectedSources[id] && selectedSources[id].type === 'img' ? 
+                            ${selectedSources[id] && selectedSources[id].type === 'img' && selectedSources[id].thumb ? 
                               `<div class="media-slot selected" data-type="img" data-src="${selectedSources[id].src}" onclick="selectSource(this, ${id})"><img src="${selectedSources[id].src}"></div>` 
                               : '<div class="media-slot"></div>'}
                         </div>
@@ -1503,7 +1512,7 @@
                             <button class="btn" style="background: var(--ai-vid); color: white;" onclick="loadMedia(${id}, 'vid')">Tạo Video</button>
                         </div>
                         <div class="media-grid" id="grid-vid-${id}">
-                            ${selectedSources[id] && selectedSources[id].type === 'vid' ? 
+                            ${selectedSources[id] && selectedSources[id].type === 'vid' && selectedSources[id].thumb ? 
                               `<div class="media-slot selected" style="grid-column:span 2" data-type="vid" data-src="${selectedSources[id].src}" onclick="selectSource(this, ${id})"><img src="${selectedSources[id].thumb || selectedSources[id].src}"><div style="position:absolute; bottom:5px; left:5px; background:rgba(0,0,0,0.8); color:#fff; font-size:10px; padding:2px 5px; border-radius:3px; font-weight:bold;">${selectedSources[id].duration}s</div></div>` 
                               : ''}
                         </div>
@@ -1515,8 +1524,20 @@
                             <button class="btn" style="background: var(--stock); color: white;" onclick="loadMedia(${id}, 'stock')">Tìm Search</button>
                         </div>
                         <div class="media-grid" id="grid-stock-${id}">
-                             ${selectedSources[id] && selectedSources[id].type === 'stock' ? 
+                             ${selectedSources[id] && selectedSources[id].type === 'stock' && selectedSources[id].thumb ? 
                               `<div class="media-slot selected" style="grid-column:span 2" data-type="stock" data-src="${selectedSources[id].src}" onclick="selectSource(this, ${id})"><img src="${selectedSources[id].thumb || selectedSources[id].src}"></div>` 
+                              : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-upload-${id}">
+                        <div style="display: flex; gap: 10px;">
+                            <input type="file" id="file-upload-${id}" class="form-control" accept="image/*,video/*" style="padding: 5px;">
+                            <button class="btn" style="background: var(--warning); color: #000;" onclick="handleLocalUpload(${id})"><i class="fa-solid fa-cloud-arrow-up"></i> Tải lên</button>
+                        </div>
+                        <div class="media-grid" id="grid-upload-${id}">
+                             ${selectedSources[id] && selectedSources[id].type === 'upload' ? 
+                              `<div class="media-slot selected" style="grid-column:span 2" data-type="${selectedSources[id].type}" data-src="${selectedSources[id].src}" onclick="selectSource(this, ${id})"><img src="${selectedSources[id].thumb || selectedSources[id].src}"></div>` 
                               : ''}
                         </div>
                     </div>
