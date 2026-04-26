@@ -757,7 +757,7 @@
 
                         <div class="tab-content" id="tab-upload-${id}">
                             <div style="display: flex; gap: 10px;">
-                                <input type="file" id="file-upload-${id}" class="form-control" accept="image/*,video/*" style="padding: 5px;">
+                                <input type="file" id="file-upload-${id}" class="form-control" accept="image/*,video/*,audio/*" style="padding: 5px;">
                                 <button class="btn" style="background: var(--warning); color: #000;" onclick="handleLocalUpload(${id})"><i class="fa-solid fa-cloud-arrow-up"></i> Tải lên</button>
                             </div>
                             <div class="media-grid" id="grid-upload-${id}"></div>
@@ -918,6 +918,58 @@
             } catch (err) {
                 grid.innerHTML = `<div style="grid-column: span 4; text-align: center; color: var(--yt-red);">Lỗi kết nối API!</div>`;
                 console.error(err);
+            }
+        }
+
+        async function handleLocalUpload(sceneId) {
+            const fileInput = document.getElementById(`file-upload-${sceneId}`);
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Vui lòng chọn một file ảnh, video hoặc âm thanh từ máy tính!");
+                return;
+            }
+
+            const grid = document.getElementById(`grid-upload-${sceneId}`);
+            grid.innerHTML = `<div style="grid-column: span 4; text-align: center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải lên server...</div>`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch("http://127.0.0.1:5000/api/upload", {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
+                    const isAudio = ['mp3', 'wav', 'm4a', 'ogg'].includes(ext);
+                    
+                    let thumbHtml = '';
+                    if (isImg) {
+                        thumbHtml = `<img src="${data.url}">`;
+                    } else if (isAudio) {
+                        thumbHtml = `<div style="display:flex; justify-content:center; align-items:center; height:100%; background:#2c2c2c;"><i class="fa-solid fa-music fa-2x" style="color:var(--audio);"></i></div><div style="position:absolute; bottom:5px; left:5px; background:rgba(0,0,0,0.8); color:#fff; font-size:10px; padding:2px 5px; border-radius:3px; font-weight:bold;">${file.name}</div>`;
+                    } else {
+                        thumbHtml = `<img src="https://picsum.photos/seed/vid/640/360"><div style="position:absolute; bottom:5px; left:5px; background:rgba(0,0,0,0.8); color:#fff; font-size:10px; padding:2px 5px; border-radius:3px; font-weight:bold;">${file.name}</div>`;
+                    }
+
+                    grid.innerHTML = `
+                        <div class="media-slot selected" data-type="${isImg ? 'img' : (isAudio ? 'audio' : 'vid')}" data-src="${data.url}" onclick="selectSource(this, ${sceneId})" style="grid-column: span 2">
+                            ${thumbHtml}
+                        </div>
+                    `;
+                    
+                    const slot = grid.querySelector('.media-slot');
+                    selectSource(slot, sceneId);
+                } else {
+                    grid.innerHTML = `<div style="grid-column: span 4; color: red;">Lỗi tải lên: ${data.message}</div>`;
+                }
+            } catch (err) {
+                console.error("Lỗi tải lên:", err);
+                grid.innerHTML = `<div style="grid-column: span 4; color: red;">Lỗi kết nối tới Backend! Chắc chắn start.bat đang chạy.</div>`;
             }
         }
 
@@ -1532,7 +1584,7 @@
                     
                     <div class="tab-content" id="tab-upload-${id}">
                         <div style="display: flex; gap: 10px;">
-                            <input type="file" id="file-upload-${id}" class="form-control" accept="image/*,video/*" style="padding: 5px;">
+                            <input type="file" id="file-upload-${id}" class="form-control" accept="image/*,video/*,audio/*" style="padding: 5px;">
                             <button class="btn" style="background: var(--warning); color: #000;" onclick="handleLocalUpload(${id})"><i class="fa-solid fa-cloud-arrow-up"></i> Tải lên</button>
                         </div>
                         <div class="media-grid" id="grid-upload-${id}">

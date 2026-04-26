@@ -60,9 +60,16 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 def download_file(url, prefix):
     try:
         if not url.startswith("http"):
+            # Nếu url là đường dẫn gốc (fallback)
             return None
         
-        ext = ".jpg" if ("photo" in url or "image" in url or "picsum" in url) else ".mp4"
+        # Thử lấy đuôi file từ url
+        ext = ".mp4"
+        if any(x in url.lower() for x in [".jpg", ".png", ".jpeg", ".webp", "photo", "image", "picsum"]):
+            ext = ".jpg"
+        if any(x in url.lower() for x in [".mp3", ".wav", ".m4a", ".ogg"]):
+            ext = ".mp3"
+            
         filename = os.path.join(TEMP_DIR, f"{prefix}{ext}")
         
         # Nếu đã tải rồi thì tái sử dụng
@@ -100,8 +107,10 @@ def render_video():
     
     images_dir = os.path.join(export_dir, "Images")
     videos_dir = os.path.join(export_dir, "Videos")
+    audios_dir = os.path.join(export_dir, "Audios")
     os.makedirs(images_dir)
     os.makedirs(videos_dir)
+    os.makedirs(audios_dir)
     
     def format_time(seconds):
         ms = int((seconds % 1) * 1000)
@@ -138,14 +147,25 @@ def render_video():
         local_path = download_file(url, f"temp_scene_{sid}_{int(time.time())}")
         
         if local_path:
-            ext = ".jpg" if local_path.lower().endswith(".jpg") or local_path.lower().endswith(".png") or local_path.lower().endswith(".jpeg") else ".mp4"
+            filename_lower = local_path.lower()
+            ext = os.path.splitext(filename_lower)[1]
+            if not ext:
+                ext = ".mp4"
+                
+            is_img = ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]
+            is_audio = ext in [".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"]
             
             try:
-                if ext == ".jpg":
-                    new_filename = f"{file_counter:02d}_scene.jpg"
+                if is_img:
+                    new_filename = f"{file_counter:02d}_scene{ext}"
                     new_path = os.path.join(images_dir, new_filename)
                     shutil.copy(local_path, new_path)
                     print(f" - Đã chép file ảnh {new_filename} vào thư mục Images/")
+                elif is_audio:
+                    new_filename = f"{file_counter:02d}_audio{ext}"
+                    new_path = os.path.join(audios_dir, new_filename)
+                    shutil.copy(local_path, new_path)
+                    print(f" - Đã chép file âm thanh {new_filename} vào thư mục Audios/")
                 else:
                     new_filename = f"{file_counter:02d}_scene.mp4"
                     new_path = os.path.join(videos_dir, new_filename)
