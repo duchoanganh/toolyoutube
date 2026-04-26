@@ -500,7 +500,7 @@
         // MỞ THƯ MỤC TRÊN MÁY TÍNH
         async function openStorageFolder() {
             try {
-                const res = await fetch("http://127.0.0.1:5000/api/open-folder", {
+                const res = await fetch("http://localhost:5000/api/open-folder", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -936,7 +936,7 @@
             formData.append('file', file);
 
             try {
-                const res = await fetch("http://127.0.0.1:5000/api/upload", {
+                const res = await fetch("http://localhost:5000/api/upload", {
                     method: 'POST',
                     body: formData
                 });
@@ -1280,7 +1280,7 @@
             };
             
             let isApiDone = false;
-            fetch("http://127.0.0.1:5000/api/render", {
+            fetch("http://localhost:5000/api/render", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
@@ -1405,7 +1405,7 @@
 
         async function fetchProjects() {
             try {
-                const res = await fetch('http://127.0.0.1:5000/api/projects');
+                const res = await fetch('http://localhost:5000/api/projects');
                 const projects = await res.json();
                 
                 const table = document.getElementById('dashboard-projects-table');
@@ -1453,7 +1453,7 @@
             const theme = prompt("Nhập Chủ đề phân loại (VD: Khoa Học, Lịch Sử):", "Chưa phân loại");
             
             try {
-                const res = await fetch('http://127.0.0.1:5000/api/projects', {
+                const res = await fetch('http://localhost:5000/api/projects', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: name, theme: theme || "Chưa phân loại" })
@@ -1482,7 +1482,7 @@
 
         async function openProject(id) {
             try {
-                const res = await fetch(`http://127.0.0.1:5000/api/projects/${id}`);
+                const res = await fetch(`http://localhost:5000/api/projects/${id}`);
                 const p = await res.json();
                 
                 if (p.id) {
@@ -1609,7 +1609,7 @@
             if(status) payload.status = status;
             
             try {
-                await fetch(`http://127.0.0.1:5000/api/projects/${currentProjectId}`, {
+                await fetch(`http://localhost:5000/api/projects/${currentProjectId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
